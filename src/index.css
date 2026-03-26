@@ -1,0 +1,63 @@
+@import "tailwindcss";
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+
+@variant dark (&:where(.dark, .dark *));
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+/* react-big-calendar dark overrides */
+.dark .rbc-calendar { background: #1e293b; color: #e2e8f0; }
+.dark .rbc-header { background: #1e293b; border-color: #334155; color: #94a3b8; font-weight: 500; }
+.dark .rbc-month-view, .dark .rbc-time-view { border-color: #334155; }
+.dark .rbc-day-bg + .rbc-day-bg, .dark .rbc-month-row + .rbc-month-row { border-color: #334155; }
+.dark .rbc-off-range-bg { background: #0f172a; }
+.dark .rbc-today { background: rgba(59, 130, 246, 0.1); }
+.dark .rbc-toolbar button { color: #e2e8f0; border-color: #334155; background: transparent; }
+.dark .rbc-toolbar button:hover { background: #334155; }
+.dark .rbc-toolbar button.rbc-active { background: #334155; }
+.dark .rbc-time-content, .dark .rbc-time-header { border-color: #334155; }
+.dark .rbc-timeslot-group { border-color: #334155; }
+.dark .rbc-time-slot { color: #64748b; }
+.dark .rbc-label { color: #64748b; }
+.dark .rbc-date-cell a { color: #e2e8f0; }
+.dark .rbc-show-more { color: #60a5fa; }
+
+/* Transition for theme switch */
+*, *::before, *::after {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+/* Disable conflicting tailwind transition classes */
+[class*="transition"], [class*="animate"] {
+  transition: none;
+}
+
+/* Task drawer slide-in animation (name avoids "animate"/"transition") */
+@keyframes drawer-slide-in {
+  from { max-height: 0; opacity: 0; transform: translateY(-4px); }
+  to   { max-height: 800px; opacity: 1; transform: translateY(0); }
+}
+.drawer-open {
+  animation: drawer-slide-in 200ms ease-out forwards;
+  overflow: hidden;
+}
+
+/* Kanban card hover – bypasses global transition override */
+.kanban-card {
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+.kanban-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
