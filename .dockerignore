@@ -1,0 +1,15 @@
+node_modules/
+dist/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/data/
+data/
+backend/alembic/
+backend/alembic.ini
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store
+.git/
+demo/
