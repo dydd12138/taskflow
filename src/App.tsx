@@ -8,6 +8,7 @@ import AllTasksView from './views/AllTasksView'
 import CalendarView from './views/CalendarView'
 import DeletedView from './views/DeletedView'
 import SettingsView from './views/SettingsView'
+import GlobalChatView from './views/GlobalChatView'
 
 function AppContent() {
   const { state } = useApp()
@@ -30,8 +31,8 @@ function AppContent() {
 
   // Apply font size
   useEffect(() => {
-    const sizes: Record<string, string> = { small: '13px', medium: '14px', large: '16px' }
-    document.body.style.fontSize = sizes[settings.fontSize] ?? '14px'
+    const sizes: Record<string, string> = { small: '14px', medium: '16px', large: '18px' }
+    document.documentElement.style.fontSize = sizes[settings.fontSize] ?? '14px'
   }, [settings.fontSize])
 
   const renderView = () => {
@@ -41,6 +42,7 @@ function AppContent() {
     if (currentView === 'calendar') return <CalendarView />
     if (currentView === 'deleted')  return <DeletedView />
     if (currentView === 'settings') return <SettingsView />
+    if (currentView === 'chat')     return <GlobalChatView />
     if (currentView.startsWith('project:')) {
       return <ProjectView projectId={Number(currentView.replace('project:', ''))} />
     }

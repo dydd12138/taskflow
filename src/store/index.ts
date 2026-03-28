@@ -11,6 +11,7 @@ import { projectsApi }   from '../api/projects'
 import { tasksApi }      from '../api/tasks'
 import { deletedTasksApi } from '../api/deletedTasks'
 import { settingsApi }   from '../api/settings'
+import { notesApi }      from '../api/notes'
 
 // ── Types mirrored in camelCase for component compatibility ───────────────────
 // (The canonical snake_case backend types live in src/types/index.ts)
@@ -39,7 +40,7 @@ export interface FETask {
   startDate: string | null
   endDate: string | null
   priority: 'none' | 'low' | 'medium' | 'high'
-  status: 'not_started' | 'in_progress' | 'completed'
+  status: 'none' | 'in_progress' | 'blocked'
   completed: boolean
   notes: string
   order: number
@@ -51,9 +52,7 @@ export interface FESettings {
   accentColor: string
   fontSize: string
   aiProvider: string
-  apiKey: string
-  model: string
-  proxyUrl: string
+  providerConfigs: Record<string, { api_key: string; model: string; base_url: string }>
 }
 
 // ── Adapters: backend → frontend ─────────────────────────────────────────────
@@ -128,6 +127,9 @@ interface AppStoreState {
   settings: FESettings
   currentView: string
   pendingExpandTaskId: string | number | null
+  noteContent: string
+  noteLoading: boolean
+  noteSaving: boolean
   _initialized: boolean
   initError: string | null
 }
@@ -142,7 +144,7 @@ interface AppStoreActions {
   createTask: (data: Partial<FETask> & { projectId: string | number; title: string }) => Promise<void>
   updateTask: (id: string | number, updates: Partial<FETask>) => Promise<void>
   deleteTask: (id: string | number) => Promise<void>
-  restoreTask: (id: string | number) => Promise<void>
+  restoreTask: (id: string | number, projectId?: string | number) => Promise<void>
   purgeTask: (id: string | number) => Promise<void>
   purgeAllDeleted: () => Promise<void>
   moveTask: (id: string | number, projectId: string | number, direction: 'up' | 'down') => void
@@ -155,12 +157,17 @@ interface AppStoreActions {
   deleteCategory: (id: string | number) => Promise<void>
 
   createProject: (data: Partial<FEProject> & { name: string }) => Promise<FEProject>
-  updateProject: (id: string | number, updates: Partial<FEProject>) => void
+  updateProject: (id: string | number, updates: Partial<FEProject>) => Promise<void>
   moveProject: (id: string | number, categoryId: string | number | null, direction: 'up' | 'down') => Promise<void>
   moveProjectToCategory: (id: string | number, targetCategoryId: string | number | null) => Promise<void>
   deleteProject: (id: string | number) => Promise<void>
 
   updateSettings: (updates: Partial<FESettings>) => Promise<void>
+
+  fetchNote: (projectId: number) => Promise<void>
+  saveNote: (projectId: number, content: string) => Promise<void>
+
+  refreshTasks: () => Promise<void>
 }
 
 const DEFAULT_SETTINGS: FESettings = {
@@ -168,9 +175,14 @@ const DEFAULT_SETTINGS: FESettings = {
   accentColor: '#3b82f6',
   fontSize: 'medium',
   aiProvider: 'Anthropic',
-  apiKey: '',
-  model: 'claude-sonnet-4-6',
-  proxyUrl: '',
+  historyLimit: 3,
+  providerConfigs: {
+    'Anthropic': { api_key: '', model: 'claude-sonnet-4-6', base_url: '', proxy: '' },
+    'OpenAI':    { api_key: '', model: 'gpt-4o',            base_url: '', proxy: '' },
+    '阿里百炼':  { api_key: '', model: 'qwen-plus',         base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', proxy: '' },
+    'Ollama':    { api_key: 'ollama', model: 'llama3',      base_url: 'http://localhost:11434/v1', proxy: '' },
+    '其他':      { api_key: '', model: '',                   base_url: '', proxy: '' },
+  },
 }
 
 let _deletedTaskApiIds = new Map<string | number, number>() // FETask id → APIDel id
@@ -183,6 +195,9 @@ const useAppStore = create<AppStoreState & AppStoreActions>()((set, get) => ({
   settings: DEFAULT_SETTINGS,
   currentView: 'today',
   pendingExpandTaskId: null,
+  noteContent: '',
+  noteLoading: false,
+  noteSaving: false,
   _initialized: false,
   initError: null,
 
@@ -234,7 +249,7 @@ const useAppStore = create<AppStoreState & AppStoreActions>()((set, get) => ({
       end_date: data.endDate ?? null,
       is_all_day: true,
       priority: data.priority ?? 'none',
-      manual_status: 'not_started',
+      manual_status: 'none',
       is_completed: false,
       note: data.notes ?? null,
       sort_order: 0,
@@ -270,12 +285,12 @@ const useAppStore = create<AppStoreState & AppStoreActions>()((set, get) => ({
     }))
   },
 
-  restoreTask: async (id) => {
+  restoreTask: async (id, projectId?) => {
     const apiId = _deletedTaskApiIds.get(id)
     if (!apiId) return
     const { deletedTasks } = get()
     const entry = deletedTasks.find(t => t.id === id)
-    const targetProjectId = (entry?.projectId ?? 1) as number
+    const targetProjectId = (projectId ?? entry?.projectId ?? 1) as number
     const restored = await deletedTasksApi.restore(apiId, targetProjectId)
     const feRestored = adaptTask(restored)
     set(s => ({
@@ -370,8 +385,16 @@ const useAppStore = create<AppStoreState & AppStoreActions>()((set, get) => ({
     return feProj
   },
 
-  updateProject: (id, updates) =>
-    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...updates } : p) })),
+  updateProject: async (id, updates) => {
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...updates } : p) }))
+    const payload: Record<string, unknown> = {}
+    if (updates.name      !== undefined) payload.name       = updates.name
+    if (updates.color     !== undefined) payload.color      = updates.color
+    if (updates.categoryId !== undefined) payload.category_id = updates.categoryId
+    if (Object.keys(payload).length > 0) {
+      await projectsApi.update(id as number, payload as any)
+    }
+  },
 
   moveProject: async (id, categoryId, direction) => {
     const { projects } = get()
@@ -410,26 +433,54 @@ const useAppStore = create<AppStoreState & AppStoreActions>()((set, get) => ({
     })
   },
 
+  // ── Notes ────────────────────────────────────────────────────────────────────
+  fetchNote: async (projectId) => {
+    set({ noteLoading: true })
+    try {
+      const content = await notesApi.get(projectId)
+      set({ noteContent: content, noteLoading: false })
+    } catch {
+      set({ noteContent: '', noteLoading: false })
+    }
+  },
+
+  saveNote: async (projectId, content) => {
+    set({ noteSaving: true })
+    try {
+      await notesApi.save(projectId, content)
+      set({ noteSaving: false })
+      // 不更新 noteContent：编辑器挂载后自身管理内容，反写会导致
+      // initialContent prop 变化 → useEditor 重建 → 光标丢失
+    } catch {
+      set({ noteSaving: false })
+    }
+  },
+
+  refreshTasks: async () => {
+    const tasks = await tasksApi.list()
+    set({ tasks: tasks.map(adaptTask) })
+  },
+
   // ── Settings ─────────────────────────────────────────────────────────────────
   updateSettings: async (updates) => {
-    const keyMap: Record<string, string> = {
-      theme:       'theme',
-      accentColor: 'theme_color',
-      fontSize:    'font_size',
-      aiProvider:  'ai_provider',
-      apiKey:      'ai_api_key',
-      model:       'ai_model',
-      proxyUrl:    'ai_proxy',
+    const simpleKeyMap: Record<string, string> = {
+      theme:        'theme',
+      accentColor:  'theme_color',
+      fontSize:     'font_size',
+      aiProvider:   'ai_provider',
+      historyLimit: 'conversation_history_limit',
     }
-    await Promise.all(
-      Object.entries(updates)
-        .map(([feKey, value]) => {
-          const beKey = keyMap[feKey]
-          if (beKey) return settingsApi.update(beKey, value)
-        })
-        .filter(Boolean)
-    )
+    const promises: Promise<any>[] = []
+    for (const [feKey, value] of Object.entries(updates)) {
+      const beKey = simpleKeyMap[feKey]
+      if (beKey) {
+        promises.push(settingsApi.update(beKey, value))
+      } else if (feKey === 'providerConfigs') {
+        promises.push(settingsApi.update('ai_providers_config', value))
+      }
+    }
     set(s => ({ settings: { ...s.settings, ...updates } }))
+    await Promise.all(promises)
   },
 }))
 
@@ -445,6 +496,9 @@ export function useApp() {
     settings:            store.settings,
     currentView:         store.currentView,
     pendingExpandTaskId: store.pendingExpandTaskId,
+    noteContent:         store.noteContent,
+    noteLoading:         store.noteLoading,
+    noteSaving:          store.noteSaving,
   }
 
   const actions = {
@@ -470,6 +524,9 @@ export function useApp() {
     moveProjectToCategory: store.moveProjectToCategory,
     deleteProject:        store.deleteProject,
     updateSettings:       store.updateSettings,
+    fetchNote:            store.fetchNote,
+    saveNote:             store.saveNote,
+    refreshTasks:         store.refreshTasks,
   }
 
   return { state, actions }

@@ -61,3 +61,14 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.10);
 }
+
+/* Milkdown editor — blend with app background, remove card shadow */
+.milkdown {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 16px !important;
+}
+
+.milkdown .editor {
+  background: transparent !important;
+}

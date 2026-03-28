@@ -72,21 +72,24 @@ export default function WeekView() {
             {/* Day headers */}
             <div className="flex border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-900 z-10">
               <div className="w-36 flex-shrink-0 px-4 py-3 border-r border-slate-100 dark:border-slate-700" />
-              {weekDays.map((day, idx) => (
-                <div key={day.toISOString()}
-                  className={`flex-1 px-2 py-3 text-center border-r border-slate-100 dark:border-slate-700 last:border-0
-                    ${isToday(day) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                >
-                  <div className={`text-xs font-semibold
-                    ${isToday(day) ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                    {CN_DAYS[idx]}
+              {weekDays.map((day, idx) => {
+                const isWeekend = idx === 5 || idx === 6;
+                return (
+                  <div key={day.toISOString()}
+                    className={`flex-1 px-2 py-3 text-center border-r border-slate-100 dark:border-slate-700 last:border-0
+                      ${isToday(day) ? 'bg-blue-50 dark:bg-blue-900/20' : isWeekend ? 'bg-rose-50/60 dark:bg-rose-900/10' : ''}`}
+                  >
+                    <div className={`text-xs font-semibold
+                      ${isToday(day) ? 'text-blue-500' : isWeekend ? 'text-rose-400 dark:text-rose-500' : 'text-slate-400 dark:text-slate-500'}`}>
+                      {CN_DAYS[idx]}
+                    </div>
+                    <div className={`text-sm font-bold mt-0.5
+                      ${isToday(day) ? 'text-blue-600 dark:text-blue-400' : isWeekend ? 'text-rose-500 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                      {format(day, 'd')}
+                    </div>
                   </div>
-                  <div className={`text-sm font-bold mt-0.5
-                    ${isToday(day) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                    {format(day, 'd')}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Project groups */}
@@ -107,12 +110,15 @@ export default function WeekView() {
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: project.color }} />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">{project.name}</span>
                     </div>
-                    {weekDays.map((day) => (
-                      <div key={day.toISOString()}
-                        className={`flex-1 border-r border-slate-100 dark:border-slate-700 last:border-0
-                          ${isToday(day) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                      />
-                    ))}
+                    {weekDays.map((day, idx) => {
+                      const isWeekend = idx === 5 || idx === 6;
+                      return (
+                        <div key={day.toISOString()}
+                          className={`flex-1 border-r border-slate-100 dark:border-slate-700 last:border-0
+                            ${isToday(day) ? 'bg-blue-50/50 dark:bg-blue-900/10' : isWeekend ? 'bg-rose-50/40 dark:bg-rose-900/10' : ''}`}
+                        />
+                      );
+                    })}
                   </div>
 
                   {/* Task rows */}
@@ -128,10 +134,12 @@ export default function WeekView() {
                           </span>
                         </div>
                         <div className="flex-1 flex relative">
-                          {weekDays.map((day, dayIdx) => (
+                          {weekDays.map((day, dayIdx) => {
+                            const isWeekend = dayIdx === 5 || dayIdx === 6;
+                            return (
                             <div key={day.toISOString()}
                               className={`flex-1 border-r border-slate-100 dark:border-slate-700 last:border-0 py-1.5 px-0.5 relative
-                                ${isToday(day) ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+                                ${isToday(day) ? 'bg-blue-50/30 dark:bg-blue-900/10' : isWeekend ? 'bg-rose-50/30 dark:bg-rose-900/8' : ''}`}
                             >
                               {dayIdx === startIdx && (
                                 <div
@@ -158,7 +166,8 @@ export default function WeekView() {
                                 </div>
                               )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -169,7 +178,11 @@ export default function WeekView() {
           </div>
         </div>
 
-        <AiPanel />
+        <AiPanel
+          contextType="week"
+          contextId={format(weekDays[0], 'yyyy-MM-dd')}
+          contextLabel="本周"
+        />
       </div>
 
       {/* Task tooltip */}

@@ -1,5 +1,6 @@
 services:
   taskflow:
+    image: taskflow:v3.0   # 部署时用已加载的镜像；本地开发时 build 会自动打上此标签
     build:
       context: .
       dockerfile: Dockerfile

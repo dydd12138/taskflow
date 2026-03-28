@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useApp } from '../store';
+import Modal from '../components/Modal';
 
 export default function DeletedView() {
   const { state, actions } = useApp();
   const [confirmClear, setConfirmClear] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState(null); // { task, selectedProjectId }
 
   const getProjectName = (id) => state.projects.find(p => p.id === id)?.name ?? '未知项目';
 
@@ -18,6 +20,44 @@ export default function DeletedView() {
     if (!str) return '-';
     try { return format(parseISO(str), 'MM-dd HH:mm'); } catch { return '-'; }
   };
+
+  const formatDeletedDate = (str) => {
+    if (!str) return '-';
+    try { return format(parseISO(str), 'yyyy-MM-dd'); } catch { return '-'; }
+  };
+
+  // Build grouped project options for the select
+  const groupedProjects = useMemo(() => {
+    const uncategorized = state.projects.filter(p => !p.categoryId);
+    const groups = [];
+    state.categories.forEach(cat => {
+      const projs = state.projects.filter(p => p.categoryId === cat.id);
+      if (projs.length > 0) groups.push({ label: cat.name, projects: projs });
+    });
+    if (uncategorized.length > 0) groups.push({ label: null, projects: uncategorized });
+    return groups;
+  }, [state.projects, state.categories]);
+
+  const openRestoreModal = (task) => {
+    const originalExists = state.projects.some(p => p.id === task.projectId);
+    const defaultProjectId = originalExists ? task.projectId : 1;
+    setRestoreTarget({ task, selectedProjectId: defaultProjectId });
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreTarget) return;
+    await actions.restoreTask(restoreTarget.task.id, restoreTarget.selectedProjectId);
+    setRestoreTarget(null);
+  };
+
+  const originalProjectExists = restoreTarget
+    ? state.projects.some(p => p.id === restoreTarget.task.projectId)
+    : true;
+
+  const originalProjectName = restoreTarget
+    ? (state.projects.find(p => p.id === restoreTarget.task.projectId)?.name
+        ?? getProjectName(restoreTarget.task.projectId))
+    : '';
 
   return (
     <div className="flex flex-col h-full">
@@ -96,7 +136,7 @@ export default function DeletedView() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() => actions.restoreTask(task.id)}
+                    onClick={() => openRestoreModal(task)}
                     className="px-3 py-1 text-xs font-medium rounded-lg border border-blue-200 dark:border-blue-700
                       text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                   >
@@ -115,6 +155,87 @@ export default function DeletedView() {
           </div>
         )}
       </div>
+
+      {/* Restore confirm modal */}
+      <Modal
+        open={!!restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        title="恢复任务"
+        maxWidth="max-w-md"
+      >
+        {restoreTarget && (
+          <div className="space-y-4">
+            {/* Task meta */}
+            <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+              <div>
+                <span className="text-slate-400 dark:text-slate-500">任务名称：</span>
+                <span className="font-medium">「{restoreTarget.task.title}」</span>
+              </div>
+              <div>
+                <span className="text-slate-400 dark:text-slate-500">删除时间：</span>
+                <span>{formatDeletedDate(restoreTarget.task.deletedAt)}</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-100 dark:border-slate-700" />
+
+            {/* Original project deleted warning */}
+            {!originalProjectExists && (
+              <p className="text-xs text-orange-500 dark:text-orange-400">
+                原项目「{originalProjectName}」已被删除，请选择其他项目
+              </p>
+            )}
+
+            {/* Project selector */}
+            <div className="space-y-1.5">
+              <label className="text-sm text-slate-600 dark:text-slate-300">恢复到项目：</label>
+              <select
+                value={restoreTarget.selectedProjectId}
+                onChange={(e) => setRestoreTarget(t => ({ ...t, selectedProjectId: Number(e.target.value) }))}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600
+                  bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              >
+                {groupedProjects.map(({ label, projects }) =>
+                  label ? (
+                    <optgroup key={label} label={label}>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.id === restoreTarget.task.projectId ? '（原项目）' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    projects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.id === restoreTarget.task.projectId ? '（原项目）' : ''}
+                      </option>
+                    ))
+                  )
+                )}
+              </select>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setRestoreTarget(null)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-600
+                  text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmRestore}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+              >
+                确认恢复
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

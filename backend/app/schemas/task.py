@@ -11,7 +11,7 @@ class TaskCreate(BaseModel):
     end_date: datetime | None = None
     is_all_day: bool | None = True
     priority: str | None = "none"
-    manual_status: str | None = "not_started"
+    manual_status: str | None = "none"
     is_completed: bool | None = False
     note: str | None = None
 

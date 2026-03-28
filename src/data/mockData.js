@@ -153,7 +153,7 @@ export const PRIORITY_CONFIG = {
 };
 
 export const STATUS_CONFIG = {
-  not_started: { label: '未开始', color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-700' },
-  in_progress:  { label: '进行中', color: 'text-blue-600',  bg: 'bg-blue-50 dark:bg-blue-900/30' },
-  completed:    { label: '已完成', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/30' },
+  none:        { label: '无标记',  color: 'text-slate-500',  bg: 'bg-slate-100 dark:bg-slate-700' },
+  in_progress: { label: '推进中',  color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/30' },
+  blocked:     { label: '搁置',    color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-900/30' },
 };

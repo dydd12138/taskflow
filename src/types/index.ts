@@ -29,8 +29,8 @@ export interface Task {
   end_date: string | null
   is_all_day: boolean
   priority: 'none' | 'low' | 'medium' | 'high'
-  /** Manual kanban status — separate from computed kanban lane */
-  manual_status: 'not_started' | 'in_progress' | 'completed'
+  /** Manual progress label — separate from computed kanban lane */
+  manual_status: 'none' | 'in_progress' | 'blocked'
   is_completed: boolean
   note: string | null
   sort_order: number
@@ -67,13 +67,19 @@ export type UpdateProjectPayload = Partial<Omit<Project, 'id' | 'created_at' | '
 /** Computed kanban swim-lane derived from dates */
 export type KanbanLane = 'not_started' | 'in_progress' | 'overdue' | 'completed'
 
+export interface ProviderConfig {
+  api_key: string
+  model: string
+  base_url: string
+  proxy: string
+}
+
 /** Frontend settings object (mirror of settings table key→value pairs) */
 export interface FrontendSettings {
-  theme: 'light' | 'dark'
+  theme: string
   accentColor: string
-  fontSize: 'small' | 'medium' | 'large'
+  fontSize: string
   aiProvider: string
-  apiKey: string
-  model: string
-  proxyUrl: string
+  historyLimit: number
+  providerConfigs: Record<string, ProviderConfig>
 }

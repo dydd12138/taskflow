@@ -16,7 +16,7 @@ class Task(Base):
     end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_all_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     priority: Mapped[str] = mapped_column(Text, nullable=False, default="none")
-    manual_status: Mapped[str] = mapped_column(Text, nullable=False, default="not_started")
+    manual_status: Mapped[str] = mapped_column(Text, nullable=False, default="none")
     is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

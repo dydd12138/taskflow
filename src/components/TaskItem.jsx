@@ -154,6 +154,14 @@ export default function TaskItem({
           </span>
         )}
 
+        {/* Status badge */}
+        {task.status && task.status !== 'none' && STATUS_CONFIG[task.status] && (
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap
+            ${STATUS_CONFIG[task.status].color} ${STATUS_CONFIG[task.status].bg}`}>
+            {STATUS_CONFIG[task.status].label}
+          </span>
+        )}
+
         {/* ⋯ menu */}
         <div className="relative flex-shrink-0" ref={menuRef} onClick={e => e.stopPropagation()}>
           <button

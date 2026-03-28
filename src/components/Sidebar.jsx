@@ -2,6 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useApp } from '../store';
 
+// ─── HighlightText ─────────────────────────────────────────────────────────────
+function HighlightText({ text, term }) {
+  if (!term) return <>{text}</>;
+  const idx = text.toLowerCase().indexOf(term.toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-200 dark:bg-yellow-700/60 text-inherit rounded-sm not-italic">{text.slice(idx, idx + term.length)}</mark>
+      {text.slice(idx + term.length)}
+    </>
+  );
+}
+
 // ─── Colors ────────────────────────────────────────────────────────────────────
 const PROJECT_COLORS = [
   '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899',
@@ -237,6 +251,7 @@ function ProjectItem({
   project, active, onNavigate,
   isFirst, isLast,
   isEditing, onStartEdit, onDoneEdit,
+  searchTerm = '',
 }) {
   const { state, actions } = useApp();
   const [hovered, setHovered] = useState(false);
@@ -276,7 +291,7 @@ function ProjectItem({
           <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: project.color }} />
           <span className={`flex-1 text-sm font-normal truncate
             ${active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300'}`}>
-            {project.name}
+            <HighlightText text={project.name} term={searchTerm} />
           </span>
           {taskCount > 0 && !hovered && !menuOpen && (
             <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">{taskCount}</span>
@@ -392,6 +407,7 @@ function CategoryItem({
   isFirst, isLast,
   editingId, setEditingId,
   editingProjectId, setEditingProjectId,
+  searchTerm = '', visibleProjects = null,
 }) {
   const { actions } = useApp();
   const [hovered, setHovered] = useState(false);
@@ -405,7 +421,11 @@ function CategoryItem({
     setEditingProjectId(proj.id);
   };
 
-  const sortedProjs = [...projects].sort((a, b) => a.order - b.order);
+  // 搜索时用过滤后的列表，否则用全部；搜索时强制展开
+  const sortedProjs = visibleProjects !== null
+    ? [...visibleProjects].sort((a, b) => a.order - b.order)
+    : [...projects].sort((a, b) => a.order - b.order);
+  const forceExpanded = !!searchTerm;
 
   return (
     <div>
@@ -444,7 +464,7 @@ function CategoryItem({
           />
         ) : (
           <span className="flex-1 text-[13px] font-semibold text-slate-600 dark:text-slate-300 select-none truncate">
-            {category.name}
+            <HighlightText text={category.name} term={searchTerm} />
           </span>
         )}
 
@@ -492,7 +512,7 @@ function CategoryItem({
       </div>
 
       {/* Projects */}
-      {!category.collapsed && (
+      {(forceExpanded || !category.collapsed) && (
         <div className="ml-4 mt-0.5 mb-1">
           {sortedProjs.map((proj, idx) => (
             <ProjectItem
@@ -505,6 +525,7 @@ function CategoryItem({
               isEditing={editingProjectId === proj.id}
               onStartEdit={() => setEditingProjectId(proj.id)}
               onDoneEdit={() => setEditingProjectId(null)}
+              searchTerm={searchTerm}
             />
           ))}
         </div>
@@ -514,10 +535,13 @@ function CategoryItem({
 }
 
 // ─── UncategorizedSection ─────────────────────────────────────────────────────
-function UncategorizedSection({ projects, currentView, onNavigate, editingProjectId, setEditingProjectId }) {
+function UncategorizedSection({ projects, currentView, onNavigate, editingProjectId, setEditingProjectId, searchTerm = '', visibleProjects = null }) {
   const [collapsed, setCollapsed] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const sortedProjs = [...projects].sort((a, b) => a.order - b.order);
+  const displayProjs = visibleProjects !== null ? visibleProjects : projects;
+  const sortedProjs = [...displayProjs].sort((a, b) => a.order - b.order);
+  const forceExpanded = !!searchTerm;
+  if (searchTerm && sortedProjs.length === 0) return null;
 
   return (
     <div>
@@ -538,7 +562,7 @@ function UncategorizedSection({ projects, currentView, onNavigate, editingProjec
         </span>
       </div>
 
-      {!collapsed && (
+      {(forceExpanded || !collapsed) && (
         <div className="ml-4 mt-0.5 mb-1">
           {sortedProjs.map((proj, idx) => (
             <ProjectItem
@@ -551,6 +575,7 @@ function UncategorizedSection({ projects, currentView, onNavigate, editingProjec
               isEditing={editingProjectId === proj.id}
               onStartEdit={() => setEditingProjectId(proj.id)}
               onDoneEdit={() => setEditingProjectId(null)}
+              searchTerm={searchTerm}
             />
           ))}
         </div>
@@ -570,6 +595,26 @@ export default function Sidebar({ width }) {
   const navigate = (view) => actions.setView(view);
   const uncategorizedProjects = projects.filter(p => p.categoryId === null);
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
+
+  // 搜索过滤：按分类名/项目名匹配
+  const searchTerm = search.trim().toLowerCase();
+  const filteredCategories = searchTerm
+    ? sortedCategories
+        .map(cat => {
+          const catMatches = cat.name.toLowerCase().includes(searchTerm);
+          const catProjects = projects.filter(p => p.categoryId === cat.id);
+          const matchingProjects = catMatches
+            ? catProjects  // 分类名匹配 → 展示全部子项目
+            : catProjects.filter(p => p.name.toLowerCase().includes(searchTerm));
+          if (!catMatches && matchingProjects.length === 0) return null;
+          return { cat, visibleProjects: matchingProjects };
+        })
+        .filter(Boolean)
+    : sortedCategories.map(cat => ({ cat, visibleProjects: null }));
+
+  const filteredUncategorized = searchTerm
+    ? uncategorizedProjects.filter(p => p.name.toLowerCase().includes(searchTerm))
+    : null;
 
   const handleNewCategory = async () => {
     const cat = await actions.createCategory({ name: '新建分类', color: '#64748b' });
@@ -601,7 +646,7 @@ export default function Sidebar({ width }) {
         <NavItem icon={<WeekIcon />}     label="本周"     active={currentView === 'week'}     onClick={() => navigate('week')} />
         <NavItem icon={<AllIcon />}      label="所有任务" active={currentView === 'all'}      onClick={() => navigate('all')} />
         <NavItem icon={<CalendarIcon />} label="日历"     active={currentView === 'calendar'} onClick={() => navigate('calendar')} />
-        <NavItem icon={<ChatIcon />}     label="对话"     active={false}                      onClick={() => {}} />
+        <NavItem icon={<ChatIcon />}     label="对话"     active={currentView === 'chat'}     onClick={() => navigate('chat')} />
       </div>
 
       {/* Divider */}
@@ -646,27 +691,31 @@ export default function Sidebar({ width }) {
 
       {/* Project tree */}
       <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-        {sortedCategories.map((cat, idx) => (
+        {filteredCategories.map(({ cat, visibleProjects }, idx) => (
           <CategoryItem
             key={cat.id}
             category={cat}
             projects={projects.filter(p => p.categoryId === cat.id)}
+            visibleProjects={visibleProjects}
             currentView={currentView}
             onNavigate={navigate}
             isFirst={idx === 0}
-            isLast={idx === sortedCategories.length - 1}
+            isLast={idx === filteredCategories.length - 1}
             editingId={editingCategoryId}
             setEditingId={setEditingCategoryId}
             editingProjectId={editingProjectId}
             setEditingProjectId={setEditingProjectId}
+            searchTerm={searchTerm}
           />
         ))}
         <UncategorizedSection
           projects={uncategorizedProjects}
+          visibleProjects={filteredUncategorized}
           currentView={currentView}
           onNavigate={navigate}
           editingProjectId={editingProjectId}
           setEditingProjectId={setEditingProjectId}
+          searchTerm={searchTerm}
         />
       </div>
 

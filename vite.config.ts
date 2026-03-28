@@ -13,6 +13,13 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: apiBase,
           changeOrigin: true,
+          ws: false,
+          configure: (proxy) => {
+            proxy.on('proxyRes', (proxyRes) => {
+              // Disable response buffering so SSE chunks are forwarded immediately
+              proxyRes.headers['x-accel-buffering'] = 'no'
+            })
+          },
         },
       },
       watch: false,

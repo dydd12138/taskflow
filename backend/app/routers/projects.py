@@ -1,9 +1,12 @@
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Project, Task
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, NoteResponse, NoteUpdate
+
+NOTES_DIR = Path("data/notes")
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -62,3 +65,22 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     db.delete(project)
     db.commit()
     return None
+
+
+@router.get("/{project_id}/note", response_model=NoteResponse)
+def get_note(project_id: int, db: Session = Depends(get_db)):
+    if not db.query(Project).filter(Project.id == project_id).first():
+        raise HTTPException(status_code=404, detail="Project not found")
+    note_file = NOTES_DIR / f"{project_id}.md"
+    content = note_file.read_text(encoding="utf-8") if note_file.exists() else ""
+    return NoteResponse(project_id=project_id, content=content)
+
+
+@router.put("/{project_id}/note", response_model=NoteResponse)
+def put_note(project_id: int, data: NoteUpdate, db: Session = Depends(get_db)):
+    if not db.query(Project).filter(Project.id == project_id).first():
+        raise HTTPException(status_code=404, detail="Project not found")
+    NOTES_DIR.mkdir(parents=True, exist_ok=True)
+    note_file = NOTES_DIR / f"{project_id}.md"
+    note_file.write_text(data.content, encoding="utf-8")
+    return NoteResponse(project_id=project_id, content=data.content)

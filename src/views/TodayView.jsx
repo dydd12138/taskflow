@@ -107,7 +107,11 @@ export default function TodayView() {
             </div>
           )}
         </div>
-        <AiPanel />
+        <AiPanel
+          contextType="today"
+          contextId={format(new Date(), 'yyyy-MM-dd')}
+          contextLabel="今天"
+        />
       </div>
 
       <NewTaskModal open={modalOpen} onClose={() => setModalOpen(false)} />
